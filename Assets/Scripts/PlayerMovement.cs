@@ -3,19 +3,17 @@ using UnityEngine;
 
 namespace Minecraft
 {
-    [RequireComponent(typeof(Rigidbody))]
+    [RequireComponent(typeof(RigidbodyMovement))]
     public class PlayerMovement : MonoBehaviour
     {
         private PlayerInput playerInput;
-        private Rigidbody body;
-
+        private RigidbodyMovement rbMovement;
+        
         [Header("Camera Stuff")]
         [SerializeField] [Range(0f, 179f)] 
         private float FOV;
-        [SerializeField] [Range(-180f, 0f)] 
-        private float lowerLookLimit;
-        [SerializeField] [Range(0f, 180f)] 
-        private float higherLookLimit;
+        [SerializeField] 
+        private Utils.FloatRange lookRange;
         [SerializeField]
         private float mouseSensitivityX;
         [SerializeField]
@@ -24,55 +22,38 @@ namespace Minecraft
         private bool invertY;
         [SerializeField] 
         private Camera playerCamera;
-        [Header("Movement")]
-        [SerializeField] 
-        private float accelerationAmount;
-        [SerializeField] 
-        private float jumpHeight;
-        [SerializeField] [Range(0f, 1f)] 
-        private float counterMovement;
-        [HideInInspector]
-        public bool grounded;
 
         private float rotationX;
-        private float rotationY;
-
+        
         private void Awake()
         {
             playerInput = new PlayerInput();
-            body = GetComponent<Rigidbody>();
+            rbMovement = GetComponent<RigidbodyMovement>();
+            playerInput.Movement.Jump.performed += _ => rbMovement.Jump();
+        }
+
+        private void FixedUpdate()
+        {
+            var input = (Vector3)playerInput.Movement.Movement.ReadValue<Vector2>(); input.z = input.y; input.y = 0f;
+            rbMovement.MoveTo(transform.position + (transform.forward * input.z + transform.right * input.x));
+            
+            // camera look stuff
+            var mouseInput = playerInput.Look.Look.ReadValue<Vector2>().normalized * Time.fixedDeltaTime;
+            var (xDelta, yDelta) = (mouseInput.x * mouseSensitivityX, mouseInput.y * mouseSensitivityY * (invertY ? -1f : 1f));
+            rotationX -= yDelta;
+            rotationX = Mathf.Clamp(rotationX, lookRange.Min, lookRange.Max);
+            transform.Rotate(Vector3.up * xDelta);
+            playerCamera.transform.rotation = Quaternion.Euler(rotationX, transform.rotation.eulerAngles.y, 0f);
         }
 
         private void OnEnable()
         {
             playerInput.Enable();
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
         }
 
         private void OnDisable()
         {
             playerInput.Disable();
-        }
-
-        private void FixedUpdate()
-        {
-            // movement
-            var input = (Vector3) playerInput.Movement.Movement.ReadValue<Vector2>() * (accelerationAmount * Time.fixedDeltaTime);
-            input.z = input.y;
-            input.y = grounded ? playerInput.Movement.Jump.ReadValue<float>() * jumpHeight : 0f;
-            var counterMovementToApply = -body.velocity * counterMovement;
-            counterMovementToApply.y = 0;
-            body.velocity += input + counterMovementToApply;
-            
-            // camera
-            var mouseInput = playerInput.Look.Look.ReadValue<Vector2>() * Time.fixedDeltaTime;
-            mouseInput.x = Mathf.Clamp(mouseInput.x, -1f, 1f) * mouseSensitivityX;
-            mouseInput.y = Mathf.Clamp(mouseInput.y, -1f, 1f) * mouseSensitivityY;
-            
-            transform.Rotate(Vector3.up * mouseInput.x);
-            playerCamera.transform.Rotate(Vector3.right * mouseInput.y);
-            playerCamera.transform.rotation = Quaternion.Euler(Mathf.Clamp(playerCamera.transform.eulerAngles.x, lowerLookLimit, higherLookLimit), playerCamera.transform.eulerAngles.z, playerCamera.transform.eulerAngles.z);
         }
 
         private void OnValidate()

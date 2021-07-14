@@ -4,10 +4,10 @@ namespace Minecraft
 {
     public class PlayerGroundCheck : MonoBehaviour
     {
-        public PlayerMovement playerMovement;
+        public RigidbodyMovement rbMovement;
         private void OnTriggerEnter(Collider _)
-         => playerMovement.grounded = true;
+         => rbMovement.grounded = true;
         private void OnTriggerExit(Collider _)
-         => playerMovement.grounded = false;
+         => rbMovement.grounded = false;
     }
 }
